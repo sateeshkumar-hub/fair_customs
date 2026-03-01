@@ -4,7 +4,7 @@ authors = [
     { name = "Lemtos Technologies", email = "sateesh.kumar@lemtos.com"}
 ]
 description = "Customizations for fair products."
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 readme = "README.md"
 dynamic = ["version"]
 dependencies = [
