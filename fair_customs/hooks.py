@@ -30,6 +30,13 @@ fixtures = [
                 "Item Type"
             ]]
         ]
+    },
+    {
+        "dt": "Report",
+        "filters": [["name", "in", [
+            "Stock Levels",
+            "Item Safety Stock Status",
+        ]]]
     }
 ]
 

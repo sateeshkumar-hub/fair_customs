@@ -1,0 +1,108 @@
+[
+ {
+  "add_total_row": 0,
+  "add_translate_data": 0,
+  "columns": [],
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Report",
+  "filters": [],
+  "is_standard": "No",
+  "javascript": null,
+  "json": null,
+  "letter_head": "Company Letterhead - Grey",
+  "modified": "2026-03-02 03:43:43.564266",
+  "module": "Stock",
+  "name": "Item Safety Stock Status",
+  "prepared_report": 0,
+  "query": "SELECT \r\n    ROW_NUMBER() OVER (ORDER BY i.item_code, po.transaction_date) AS \"ID:Int:80\",\r\n\r\n    /* Item Code only on first row */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN CONCAT('<div style=\"text-align:left;\">', i.item_code, '</div>')\r\n        ELSE ''\r\n    END AS \"Item Code:HTML:100\",\r\n\r\n    /* Item Name only on first row */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN CONCAT('<div style=\"text-align:left;\">', i.item_name, '</div>')\r\n        ELSE ''\r\n    END AS \"Item Name:HTML:300\",\r\n\r\n\r\n    /* Item Group */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN CONCAT('<div style=\"text-align:left;\">', i.item_group, '</div>')\r\n        ELSE ''\r\n    END AS \"Item Category:HTML:180\",\r\n\r\n\r\n    /* Brand */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN CONCAT('<div style=\"text-align:left;\">', i.brand, '</div>')\r\n        ELSE ''\r\n    END AS \"Brand:HTML:160\",\r\n\r\n    /* Default Supplier */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN CONCAT('<div style=\"text-align:left;\">', idef.default_supplier, '</div>')\r\n        ELSE ''\r\n    END AS \"Default Supplier:HTML:220\",\r\n\r\n    /* Safety Stock */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN i.safety_stock\r\n        ELSE NULL\r\n    END AS \"Safety Stock::200\",\r\n\r\n    /* Current Qty */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN COALESCE(b.current_qty, 0)\r\n        ELSE NULL\r\n    END AS \"Current Qty::145\",\r\n\r\n    /* Stock Percent */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) = 1\r\n        THEN ROUND(\r\n            CASE \r\n                WHEN i.safety_stock > 0 \r\n                THEN (COALESCE(b.current_qty, 0) / i.safety_stock) * 100\r\n                ELSE 0\r\n            END,\r\n        2)\r\n        ELSE NULL\r\n    END AS \"Percent::120\",\r\n\r\n    /* Order Already Placed - Updated with Link */\r\n    CASE \r\n        WHEN po.name IS NOT NULL THEN\r\n            CONCAT(\r\n                '<div style=\"text-align:left;\"><a href=\"/app/purchase-order/', \r\n                po.name, \r\n                '\" target=\"_blank\">', \r\n                po.name, \r\n                '</a></div>'\r\n            )\r\n        ELSE ''\r\n    END AS \"Order Already Placed:HTML:220\",\r\n\r\n    /* Order To Place */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) != 1\r\n        THEN NULL\r\n        ELSE\r\n            GREATEST(\r\n                COALESCE(i.safety_stock, 0)\r\n                - COALESCE(b.current_qty, 0)\r\n                - COALESCE(\r\n                    SUM(poi.qty - COALESCE(poi.received_qty, 0))\r\n                    OVER (PARTITION BY i.item_code),\r\n                    0\r\n                ),\r\n                0\r\n            )\r\n    END AS \"Order To Place::160\",\r\n\r\n    /* PO Ordered Qty */\r\n    poi.qty AS \"PO Qty::110\",\r\n\r\n    /* Received Qty */\r\n    COALESCE(poi.received_qty, 0) AS \"Received Qty::140\",\r\n\r\n    /* Incoming Qty */\r\n    (poi.qty - COALESCE(poi.received_qty, 0)) AS \"Incoming Qty::140\",\r\n\r\n    /* ACTION COLUMN */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) != 1\r\n        THEN ''\r\n        WHEN COALESCE(b.current_qty, 0) >= COALESCE(i.safety_stock, 0)\r\n        THEN '<div style=\"text-align:left;font-weight:bold;\">NO ACTION NEEDED</div>'\r\n        WHEN (\r\n            COALESCE(b.current_qty, 0)\r\n            + COALESCE(\r\n                SUM(poi.qty - COALESCE(poi.received_qty, 0))\r\n                OVER (PARTITION BY i.item_code),\r\n                0\r\n            )\r\n        ) >= COALESCE(i.safety_stock, 0)\r\n        THEN '<div style=\"text-align:left;font-weight:bold;\">NO ACTION NEEDED</div>'\r\n        ELSE '<div style=\"text-align:left;font-weight:bold;color:red;\">ACTION NEEDED</div>'\r\n    END AS \"Action:HTML:160\",\r\n\r\n    /* Indicator */\r\n    CASE\r\n        WHEN ROW_NUMBER() OVER (PARTITION BY i.item_code ORDER BY po.transaction_date) != 1\r\n        THEN ''\r\n        WHEN IFNULL(i.safety_stock, 0) = 0\r\n             AND COALESCE(b.current_qty, 0) > 0 THEN\r\n            '<div style=\"background:#f5f8fa;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#000000;\">White</div>'\r\n        WHEN IFNULL(i.safety_stock, 0) = 0 THEN\r\n            '<div style=\"background:#000000;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#dae6ed;\">Black</div>'\r\n        WHEN (\r\n            (COALESCE(b.current_qty, 0) / NULLIF(i.safety_stock, 0)) * 100\r\n        ) <= 0 THEN\r\n            '<div style=\"background:#000000;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#dae6ed;\"s>Black</div>'\r\n        WHEN (\r\n            (COALESCE(b.current_qty, 0) / NULLIF(i.safety_stock, 0)) * 100\r\n        ) < 33 THEN\r\n            '<div style=\"background:#e74c3c;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#dae6ed;\">Red</div>'\r\n        WHEN (\r\n            (COALESCE(b.current_qty, 0) / NULLIF(i.safety_stock, 0)) * 100\r\n        ) < 66 THEN\r\n            '<div style=\"background:#f39c12;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#dae6ed;\">Yellow</div>'\r\n        WHEN (\r\n            (COALESCE(b.current_qty, 0) / NULLIF(i.safety_stock, 0)) * 100\r\n        ) <= 100 THEN\r\n            '<div style=\"background:#2ecc71;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#dae6ed;\">Green</div>'\r\n        ELSE\r\n            '<div style=\"background:#f5f8fa;width:100%%;min-height:20px;border-radius:10px; text-align:center; font-size:13px; color:#000000;\">White</div>'\r\n    END AS \"Indicator:HTML:100\"\r\n\r\nFROM\r\n    `tabItem` i\r\n\r\nLEFT JOIN (\r\n    SELECT\r\n        item_code,\r\n        SUM(actual_qty) AS current_qty\r\n    FROM\r\n        `tabBin`\r\n    GROUP BY\r\n        item_code\r\n) b ON b.item_code = i.item_code\r\n\r\nLEFT JOIN (\r\n    SELECT\r\n        parent AS item_code,\r\n        default_supplier\r\n    FROM\r\n        `tabItem Default`\r\n) idef ON idef.item_code = i.item_code\r\n\r\nLEFT JOIN `tabPurchase Order Item` poi\r\n    ON poi.item_code = i.item_code\r\n    AND (poi.qty - COALESCE(poi.received_qty, 0)) > 0\r\n\r\nLEFT JOIN `tabPurchase Order` po\r\n    ON po.name = poi.parent\r\n    AND po.docstatus = 1\r\n    AND po.status NOT IN ('Closed', 'Completed')\r\n\r\nWHERE\r\n    i.disabled = 0\r\n    AND i.is_stock_item = 1\r\n\r\nORDER BY\r\n    i.item_code,\r\n    po.transaction_date;",
+  "ref_doctype": "Item",
+  "reference_report": null,
+  "report_name": "Item Safety Stock Status",
+  "report_script": null,
+  "report_type": "Query Report",
+  "roles": [
+   {
+    "role": "Item Manager"
+   },
+   {
+    "role": "Stock Manager"
+   },
+   {
+    "role": "Stock User"
+   },
+   {
+    "role": "Sales User"
+   },
+   {
+    "role": "Purchase User"
+   },
+   {
+    "role": "Maintenance User"
+   },
+   {
+    "role": "Accounts User"
+   },
+   {
+    "role": "Manufacturing User"
+   },
+   {
+    "role": "Desk User"
+   }
+  ],
+  "timeout": 0
+ },
+ {
+  "add_total_row": 0,
+  "add_translate_data": 0,
+  "columns": [],
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Report",
+  "filters": [],
+  "is_standard": "No",
+  "javascript": null,
+  "json": null,
+  "letter_head": "Company Letterhead - Grey",
+  "modified": "2026-03-02 03:44:39.206915",
+  "module": "Stock",
+  "name": "Stock Levels",
+  "prepared_report": 0,
+  "query": "SELECT \r\n    b.item_code AS \"Item:Link/Item:350\",\r\n    SUM(b.actual_qty) AS \"Total Qty:Float:350\",\r\n    SUM(b.stock_value) AS \"Total Stock Value:Currency:500\"\r\nFROM \r\n    tabBin b\r\nWHERE \r\n    b.actual_qty > 0\r\nGROUP BY \r\n    b.item_code\r\nORDER BY \r\n    b.item_code;",
+  "ref_doctype": "Item",
+  "reference_report": null,
+  "report_name": "Stock Levels",
+  "report_script": null,
+  "report_type": "Query Report",
+  "roles": [
+   {
+    "role": "Item Manager"
+   },
+   {
+    "role": "Stock Manager"
+   },
+   {
+    "role": "Stock User"
+   },
+   {
+    "role": "Sales User"
+   },
+   {
+    "role": "Purchase User"
+   },
+   {
+    "role": "Maintenance User"
+   },
+   {
+    "role": "Accounts User"
+   },
+   {
+    "role": "Manufacturing User"
+   },
+   {
+    "role": "Desk User"
+   }
+  ],
+  "timeout": 0
+ }
+]
