@@ -5,6 +5,34 @@ app_description = "Customizations for fair products."
 app_email = "sateesh.kumar@lemtos.com"
 app_license = "mit"
 
+
+
+fixtures = [
+    # Custom Fields added to Item
+    {
+        "dt": "Custom Field",
+        "filters": [["dt", "=", "Item"]]
+    },
+
+    # Property changes made to Item
+    {
+        "dt": "Property Setter",
+        "filters": [["doc_type", "=", "Item"]]
+    },
+
+    # Your 3 Custom DocTypes
+    {
+        "dt": "DocType",
+        "filters": [
+            ["name", "in", [
+                "Item Grade",
+                "Item Heat No",
+                "Item Type"
+            ]]
+        ]
+    }
+]
+
 # Apps
 # ------------------
 
