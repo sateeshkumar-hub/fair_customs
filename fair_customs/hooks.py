@@ -37,7 +37,14 @@ fixtures = [
             "Stock Levels",
             "Item Safety Stock Status",
         ]]]
+    },
+    {
+        "doctype": "Print Format",
+        "filters": [
+            ["custom_format", "=", 1]
+        ]
     }
+
 ]
 
 # Apps
